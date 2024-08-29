@@ -1,0 +1,32 @@
+{
+  "name": "flashcards-ai",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@clerk/nextjs": "^4.31.4",
+    "@emotion/react": "^11.13.3",
+    "@emotion/styled": "^11.13.0",
+    "@google/generative-ai": "^0.17.1",
+    "@mui/material": "^5.16.7",
+    "@stripe/stripe-js": "^4.3.0",
+    "firebase": "^10.13.0",
+    "next": "14.2.5",
+    "openai": "^4.56.0",
+    "react": "^18",
+    "react-dom": "^18",
+    "stripe": "^16.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.5.0",
+    "@types/react": "18.3.4",
+    "eslint": "^8",
+    "eslint-config-next": "^0.2.4",
+    "typescript": "5.5.4"
+  }
+}
