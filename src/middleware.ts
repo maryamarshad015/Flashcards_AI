@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 
 export default authMiddleware({
   afterAuth: (auth, req, evt) => {
+    // Log the authentication object and request URL for debugging
+    console.log('Auth Object:', auth);
+    console.log('Request URL:', req.nextUrl.href);
+
     const url = req.nextUrl;
 
     // Allow access to the home page ('/'), sign-in page ('/sign-in'), and sign-up page ('/sign-up') even if not authenticated
@@ -12,10 +16,12 @@ export default authMiddleware({
 
     // Redirect to the sign-in page if the user is not authenticated and trying to access a protected route
     if (!auth.userId) {
+      console.log('User not authenticated, redirecting to /sign-in');
       return NextResponse.redirect(new URL('/sign-in', req.url));
     }
 
     // Allow access to other routes if authenticated
+    console.log('User authenticated, allowing access');
     return NextResponse.next();
   },
 });
