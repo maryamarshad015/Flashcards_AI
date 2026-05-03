@@ -20,8 +20,6 @@ Return the following JSON format:
 }
 `;
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
 const getRetryAfterSeconds = (error) => {
     const retryDelay = error?.errorDetails?.find(
         (detail) => detail['@type'] === 'type.googleapis.com/google.rpc.RetryInfo'
@@ -63,23 +61,7 @@ export async function POST(req) {
         // Combine system prompt and user input
         const prompt = `${systemPrompt}\n\nUser Input:\n${data}`;
 
-        // Retry once when Gemini asks us to back off briefly.
-        let result;
-        try {
-            result = await model.generateContent(prompt);
-        } catch (error) {
-            if (error?.status === 429) {
-                const retryAfterSeconds = getRetryAfterSeconds(error);
-                if (retryAfterSeconds) {
-                    await sleep((retryAfterSeconds + 1) * 1000);
-                    result = await model.generateContent(prompt);
-                } else {
-                    throw error;
-                }
-            } else {
-                throw error;
-            }
-        }
+        const result = await model.generateContent(prompt);
         const responseText = await result.response.text();  // Get the raw JSON text from the result
 
         console.log('Raw JSON response from API:', responseText); // For debugging purposes

@@ -54,6 +54,37 @@ export default function Generate() {
     const [error, setError] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
 
+    const requestFlashcards = async () => {
+        const res = await fetch('/api/generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ text }),
+        });
+
+        const raw = await res.text();
+        let data = {};
+
+        try {
+            data = raw ? JSON.parse(raw) : {};
+        } catch (parseError) {
+            if (!res.ok) {
+                throw new Error(raw || 'The server returned an invalid response.');
+            }
+
+            throw new Error('The server returned an invalid response.');
+        }
+
+        if (!res.ok) {
+            const error = new Error(data.error || 'Failed to generate flashcards.');
+            error.retryAfterSeconds = data.retryAfterSeconds;
+            throw error;
+        }
+
+        return data;
+    };
+
     const handleSubmit = async () => {
         if (!text.trim()) {
             setError('Please enter some text first.');
@@ -64,18 +95,17 @@ export default function Generate() {
         setError('');
 
         try {
-            const res = await fetch('/api/generate', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ text }),
-            });
+            let data;
 
-            const data = await res.json();
-
-            if (!res.ok) {
-                throw new Error(data.error || 'Failed to generate flashcards.');
+            try {
+                data = await requestFlashcards();
+            } catch (error) {
+                if (error.retryAfterSeconds && error.retryAfterSeconds <= 5) {
+                    await new Promise((resolve) => setTimeout(resolve, (error.retryAfterSeconds + 1) * 1000));
+                    data = await requestFlashcards();
+                } else {
+                    throw error;
+                }
             }
 
             const flashcards = data.flashcards;
