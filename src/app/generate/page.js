@@ -51,27 +51,48 @@ export default function Generate() {
     const [open, setOpen] = useState(false);
     const router = useRouter();
     const [flashcards, setFlashcards] = useState([]);
+    const [error, setError] = useState('');
+    const [isGenerating, setIsGenerating] = useState(false);
 
     const handleSubmit = async () => {
-        fetch('/api/generate', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ text }),
-        })
-        .then((res) => res.json())
-        .then((data) => {
+        if (!text.trim()) {
+            setError('Please enter some text first.');
+            return;
+        }
+
+        setIsGenerating(true);
+        setError('');
+
+        try {
+            const res = await fetch('/api/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ text }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed to generate flashcards.');
+            }
+
             const flashcards = data.flashcards;
             if (Array.isArray(flashcards)) {
                 setFlashcards(flashcards);
             } else if (flashcards) {
                 setFlashcards([flashcards]);
+            } else {
+                setFlashcards([]);
             }
-        })
-        .catch((error) => {
+        } catch (error) {
             console.error('Error:', error);
-        });
+            setFlashcards([]);
+            setError(error.message || 'Failed to generate flashcards.');
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
     const handleCardClick = (id) => {
@@ -149,9 +170,15 @@ export default function Generate() {
                         color='primary'
                         onClick={handleSubmit}
                         fullWidth
+                        disabled={isGenerating}
                     >
-                        Submit
+                        {isGenerating ? 'Generating...' : 'Submit'}
                     </Button>
+                    {error && (
+                        <Typography color='error' sx={{ mt: 2 }}>
+                            {error}
+                        </Typography>
+                    )}
                 </Paper>     
             </Box>
 

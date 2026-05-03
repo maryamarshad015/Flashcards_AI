@@ -22,12 +22,31 @@ Return the following JSON format:
 
 export async function POST(req) {
     try {
-        const data = await req.text();
+        const contentType = req.headers.get('content-type') || '';
+        let data = '';
+
+        if (contentType.includes('application/json')) {
+            const body = await req.json();
+            data = body?.text || '';
+        } else {
+            data = await req.text();
+        }
+
+        const apiKey = process.env.GEMINI_API_KEY;
+        const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+
+        if (!apiKey) {
+            return NextResponse.json({ error: 'Missing GEMINI_API_KEY' }, { status: 500 });
+        }
+
+        if (!data.trim()) {
+            return NextResponse.json({ error: 'Please enter text to generate flashcards.' }, { status: 400 });
+        }
 
         // Initialize the GenerativeAI client with JSON response type
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({
-            model: "gemini-1.5-flash",
+            model: modelName,
             generationConfig: { responseMimeType: "application/json" }
         });
 
@@ -59,6 +78,24 @@ export async function POST(req) {
         }
     } catch (error) {
         console.error('Error generating flashcards:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        const status = error?.status || 500;
+        const retryDelay = error?.errorDetails?.find(
+            (detail) => detail['@type'] === 'type.googleapis.com/google.rpc.RetryInfo'
+        )?.retryDelay;
+
+        if (status === 429) {
+            const retryAfterSeconds = retryDelay ? parseInt(retryDelay, 10) : null;
+            return NextResponse.json(
+                {
+                    error: retryAfterSeconds
+                        ? `Gemini rate limit reached. Please wait about ${retryAfterSeconds} seconds and try again.`
+                        : 'Gemini rate limit reached. Please wait a bit and try again.',
+                    retryAfterSeconds,
+                },
+                { status: 429 }
+            );
+        }
+
+        return NextResponse.json({ error: error.message || 'Failed to generate flashcards.' }, { status });
     }
 }

@@ -9,8 +9,13 @@ export default authMiddleware({
 
     const url = req.nextUrl;
 
-    // Allow access to the home page ('/'), sign-in page ('/sign-in'), and sign-up page ('/sign-up') even if not authenticated
-    if (url.pathname === '/' || url.pathname === '/sign-in' || url.pathname === '/sign-up') {
+    // Clerk uses nested auth routes during the sign-in/sign-up flow, so allow those
+    // prefixes to pass through unauthenticated.
+    if (
+      url.pathname === '/' ||
+      url.pathname.startsWith('/sign-in') ||
+      url.pathname.startsWith('/sign-up')
+    ) {
       return NextResponse.next();
     }
 
