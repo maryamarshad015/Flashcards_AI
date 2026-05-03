@@ -20,6 +20,16 @@ Return the following JSON format:
 }
 `;
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const getRetryAfterSeconds = (error) => {
+    const retryDelay = error?.errorDetails?.find(
+        (detail) => detail['@type'] === 'type.googleapis.com/google.rpc.RetryInfo'
+    )?.retryDelay;
+
+    return retryDelay ? parseInt(retryDelay, 10) : null;
+};
+
 export async function POST(req) {
     try {
         const contentType = req.headers.get('content-type') || '';
@@ -33,7 +43,7 @@ export async function POST(req) {
         }
 
         const apiKey = process.env.GEMINI_API_KEY;
-        const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+        const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash-lite';
 
         if (!apiKey) {
             return NextResponse.json({ error: 'Missing GEMINI_API_KEY' }, { status: 500 });
@@ -53,8 +63,23 @@ export async function POST(req) {
         // Combine system prompt and user input
         const prompt = `${systemPrompt}\n\nUser Input:\n${data}`;
 
-        // Generate content using the model
-        const result = await model.generateContent(prompt);
+        // Retry once when Gemini asks us to back off briefly.
+        let result;
+        try {
+            result = await model.generateContent(prompt);
+        } catch (error) {
+            if (error?.status === 429) {
+                const retryAfterSeconds = getRetryAfterSeconds(error);
+                if (retryAfterSeconds) {
+                    await sleep((retryAfterSeconds + 1) * 1000);
+                    result = await model.generateContent(prompt);
+                } else {
+                    throw error;
+                }
+            } else {
+                throw error;
+            }
+        }
         const responseText = await result.response.text();  // Get the raw JSON text from the result
 
         console.log('Raw JSON response from API:', responseText); // For debugging purposes
@@ -79,12 +104,9 @@ export async function POST(req) {
     } catch (error) {
         console.error('Error generating flashcards:', error);
         const status = error?.status || 500;
-        const retryDelay = error?.errorDetails?.find(
-            (detail) => detail['@type'] === 'type.googleapis.com/google.rpc.RetryInfo'
-        )?.retryDelay;
 
         if (status === 429) {
-            const retryAfterSeconds = retryDelay ? parseInt(retryDelay, 10) : null;
+            const retryAfterSeconds = getRetryAfterSeconds(error);
             return NextResponse.json(
                 {
                     error: retryAfterSeconds
